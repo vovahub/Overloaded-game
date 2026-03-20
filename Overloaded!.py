@@ -10,9 +10,9 @@ import time
 window = pyglet.window.Window(1280, 720, "Overloaded!", resizable=True) # 设置窗口, vsync=True
 window.set_minimum_size(640, 360) # 设置窗口最小宽高
 window.set_maximum_size(1920, 1080) # 设置窗口最大宽高
+
 按键 = pyglet.window.key.KeyStateHandler()
 window.push_handlers(按键)
-
 def 过渡(目前值, 目标值, 过渡参数, adt):
     结果 = 目前值 + ( (目标值 - 目前值) / 过渡参数) * adt * 60
     return 结果
@@ -31,14 +31,14 @@ cam_鼠标偏移系数 = 0.5
 
 物体 = {}
 物体size = {}
-def 空间创建(重力x=0,重力y=-500,阻尼=0.5,迭代=10,启动空间哈希加速=False,空间哈希加速网格大小=100):
+def 空间创建(重力x=0,重力y=-500,阻尼=0.5,迭代=10,启动空间哈希加速=False,空间哈希加速_网格大小=25,空间哈希加速_预估数量=200):
     global 物理空间
     物理空间 = pymunk.Space() # 创建
     物理空间.gravity = (重力x, 重力y) # 空间向量_其实就是重力方向
     物理空间.damping = 阻尼 # 阻尼,越小空气越粘稠
     物理空间.iterations = 迭代 # 碰撞迭代,次数越多或许越精准但是可能更卡
     if 启动空间哈希加速:
-        物理空间.use_spatial_hash(cell_size=空间哈希加速网格大小) #空间哈希加速
+        物理空间.use_spatial_hash(dim=空间哈希加速_网格大小,count=空间哈希加速_预估数量) #空间哈希加速
 def 模拟(DT):
     物理空间.step(DT)
 def 创建矩形物体(名字,中心坐标X,中心坐标Y,矩形X,矩形Y,角度,摩擦力=0.1,弹性=0.0,静态=False,物体质量=0.1,转动惯量=float('inf')):
@@ -56,13 +56,15 @@ def 创建矩形物体(名字,中心坐标X,中心坐标Y,矩形X,矩形Y,角度
     物体[名字]["shape"].elasticity = 弹性
     物理空间.add(物体[名字]["body"],物体[名字]["shape"])
 
-空间创建(重力y=-1000,阻尼=0.7)
+空间创建(重力y=-1000,阻尼=0.7,启动空间哈希加速=True,空间哈希加速_网格大小=25,空间哈希加速_预估数量=200*10)
 创建矩形物体("玩家",window.width//2,window.height//2,50,50,0,0.3,0.5,False,0.1)
+创建矩形物体("超级重方块",window.width//2,window.height//2+400,50,50,0,0,0.5,False,1,100)
 创建矩形物体("地板",window.width//2,25,2000,25,25,0.3,0.5,True,0.1)
-创建矩形物体("地板2",window.width//2,25,200,25,0,0.3,0.5,True,0.1)
+创建矩形物体("地板2",window.width//2+10,25,200,25,0,0.3,0.5,True,0.1)
+创建矩形物体("地板3",window.width//2,-200,20000,25,0,0.3,0.5,True,0.1)
+for i in range(200):
+    创建矩形物体(f"测试方块2{i}",window.width//2,window.height//2+200,15,15,0,0.3,0.5,False,0.0001,100)
 
-batch_物体 = pyglet.graphics.Batch()
-渲染_物体 = {}
 # ------------------------------------渲染函数初始化------------------------------------
 # 物体_基础
 batch_物体 = pyglet.graphics.Batch()
@@ -86,7 +88,11 @@ for 该物体 in list(物体.keys()):
 batch_玩家状态 = pyglet.graphics.Batch()
 渲染_玩家状态 = {}
 过渡_状态_玩家血量 = 0
-过渡_状态_玩家能量 = 0
+过渡_状态_玩家能量_过度条 = 0
+过渡_状态_玩家能量_前景条 = 0
+过渡_状态_玩家能量_颜色亮度1 = 0.2
+过渡_状态_玩家能量_颜色亮度2 = 0.2
+过渡_状态_玩家能量_颜色亮度3 = 0.2
 # 状态_对象
 渲染_玩家状态["血量_背景"] = pyglet.shapes.Rectangle(
     x = window.width-25-1,
@@ -115,7 +121,7 @@ batch_玩家状态 = pyglet.graphics.Batch()
 渲染_玩家状态["能量_背景"] = pyglet.shapes.Rectangle(
     x = 5 - 1,
     y = 5 - 1,
-    width = 4 * 150 + 2,
+    width = 4 * 150 + 10,
     height = 20 + 2,
     color = (255, 255, 255, 150),
     batch = batch_玩家状态
@@ -123,35 +129,35 @@ batch_玩家状态 = pyglet.graphics.Batch()
 渲染_玩家状态["能量_过渡条"] = pyglet.shapes.Rectangle(
     x = 5,
     y = 5,
-    width = 4 * max(0,min(过渡_状态_玩家能量,150)),
+    width = 4 * max(0,min(过渡_状态_玩家能量_过度条,150)) + 6,
     height = 20,
-    color = (34, 122, 255, 200),
+    color = (207, 255, 17, 200),
     batch = batch_玩家状态
 )
 渲染_玩家状态["能量_前景"] = pyglet.shapes.Rectangle(
     x = 5,
     y = 5,
-    width = 4 * max(0,min(状态_玩家能量,150)),
+    width = 4 * 50,
     height = 20,
-    color = (48, 0, 238, 200),
+    color = (48, 0, 238, 255),
     batch = batch_玩家状态
 )
-# 渲染_玩家状态["能量_前景2"] = pyglet.shapes.Rectangle(
-#     x = 5,
-#     y = 5,
-#     width = 4 * max(0,min(状态_玩家能量,150)),
-#     height = 20,
-#     color = (48, 0, 238, 200),
-#     batch = batch_玩家状态
-# )
-# 渲染_玩家状态["能量_前景3"] = pyglet.shapes.Rectangle(
-#     x = 5,
-#     y = 5,
-#     width = 4 * max(0,min(状态_玩家能量,150)),
-#     height = 20,
-#     color = (48, 0, 238, 200),
-#     batch = batch_玩家状态
-# )
+渲染_玩家状态["能量_前景2"] = pyglet.shapes.Rectangle(
+    x = 206,
+    y = 5,
+    width = 4 * 50,
+    height = 20,
+    color = (48, 0, 238, 255),
+    batch = batch_玩家状态
+)
+渲染_玩家状态["能量_前景3"] = pyglet.shapes.Rectangle(
+    x = 407,
+    y = 5,
+    width = 4 * 50,
+    height = 20,
+    color = (48, 0, 238, 255),
+    batch = batch_玩家状态
+)
 # --------------------
 # 指示红线_基础
 batch_指示红线 = pyglet.graphics.Batch()
@@ -171,16 +177,6 @@ batch_指示红线 = pyglet.graphics.Batch()
 渲染_指示红线["主体线"].rotation = 角度(玩家坐标X,玩家坐标Y,cam_鼠标X,cam_鼠标Y)
 # ------------------------------------渲染更新函数------------------------------------
 def 渲染任务_指示红线():
-    # global 过渡_指示红线_主体线_x,过渡_指示红线_主体线_y
-    # 指示红线过渡参数 = 1.5
-    # 玩家坐标X, 玩家坐标Y = 物体["玩家"]["body"].position
-    # # 用过渡解决参数计算延迟鬼畜问题
-    # 过渡_指示红线_主体线_x = 过渡(过渡_指示红线_主体线_x,玩家坐标X - cam_X,指示红线过渡参数,dt)
-    # 过渡_指示红线_主体线_y = 过渡(过渡_指示红线_主体线_y,玩家坐标Y - cam_Y,指示红线过渡参数,dt)
-    # 渲染_指示红线["主体线"].x = 过渡_指示红线_主体线_x
-    # 渲染_指示红线["主体线"].y = 过渡_指示红线_主体线_y
-    # 渲染_指示红线["主体线"].width = 长度(玩家坐标X,玩家坐标Y,cam_鼠标X,cam_鼠标Y)
-    # 渲染_指示红线["主体线"].rotation = 角度(玩家坐标X,玩家坐标Y,cam_鼠标X,cam_鼠标Y)
     global 过渡_指示红线_主体线_x,过渡_指示红线_主体线_y
     玩家坐标X, 玩家坐标Y = 物体["玩家"]["body"].position
     渲染_指示红线["主体线"].x = 玩家坐标X - cam_X
@@ -195,22 +191,44 @@ def 渲染任务_物理体(dt):
         渲染_物体[该物体].x = 该物体坐标X-cam_X
         渲染_物体[该物体].y = 该物体坐标Y-cam_Y
         渲染_物体[该物体].rotation = - 该物体D
-    # 红线渲染与物理体渲染放在一起,这是为了防止出现抖动,即使牺牲了规整
     渲染任务_指示红线()
 def 渲染任务_玩家状态(dt):
-    global 过渡_状态_玩家血量,过渡_状态_玩家能量
-    过渡参数_过渡条 = 10
+    global 过渡_状态_玩家血量,过渡_状态_玩家能量_过度条,过渡_状态_玩家能量_前景条,过渡_状态_玩家能量_颜色亮度1,过渡_状态_玩家能量_颜色亮度2,过渡_状态_玩家能量_颜色亮度3
+    过渡参数_过渡条 = 20
+    过渡参数_前景条 = 2
+    过渡参数_亮度_增加 = 15
+    过渡参数_亮度_减少 = 2
     渲染_玩家状态["血量_背景"].x = window.width-25-1
     渲染_玩家状态["血量_背景"].height = 2 * 100 +2
     渲染_玩家状态["血量_过度条"].x = window.width-25
     渲染_玩家状态["血量_过度条"].height = 2 * max(0,min(过渡_状态_玩家血量,100))
     渲染_玩家状态["血量_前景"].x = window.width-25
     渲染_玩家状态["血量_前景"].height = 2 * max(0,min(状态_玩家血量,100))
-    渲染_玩家状态["能量_背景"].width = 4 * 150 + 2
-    渲染_玩家状态["能量_过渡条"].width = 4 * max(0,min(过渡_状态_玩家能量,150))
-    渲染_玩家状态["能量_前景"].width = 4 * max(0,min(状态_玩家能量,150))
+    渲染_玩家状态["能量_背景"].width = 4 * 150 + 4
+    渲染_玩家状态["能量_过渡条"].width = 4 * max(0,min(过渡_状态_玩家能量_过度条,150)) + 2
+    渲染_玩家状态["能量_前景"].width = 4 * max(0,min(过渡_状态_玩家能量_前景条,50))
+    渲染_玩家状态["能量_前景2"].width = 4 * max(0,min(过渡_状态_玩家能量_前景条-50,50))
+    渲染_玩家状态["能量_前景3"].width = 4 * max(0,min(过渡_状态_玩家能量_前景条-100,50))
     过渡_状态_玩家血量 = 过渡(过渡_状态_玩家血量,状态_玩家血量,过渡参数_过渡条,dt)
-    过渡_状态_玩家能量 = 过渡(过渡_状态_玩家能量,状态_玩家能量,过渡参数_过渡条,dt)
+    过渡_状态_玩家能量_过度条 = 过渡(过渡_状态_玩家能量_过度条,状态_玩家能量,过渡参数_过渡条,dt)
+    过渡_状态_玩家能量_前景条 = 过渡(过渡_状态_玩家能量_前景条,状态_玩家能量,过渡参数_前景条,dt)
+    渲染_玩家状态["能量_前景"].color = (int(48*过渡_状态_玩家能量_颜色亮度1), int(0*过渡_状态_玩家能量_颜色亮度1), int(238*过渡_状态_玩家能量_颜色亮度1), 255)
+    渲染_玩家状态["能量_前景2"].color = (int(48*过渡_状态_玩家能量_颜色亮度2), int(0*过渡_状态_玩家能量_颜色亮度2), int(238*过渡_状态_玩家能量_颜色亮度2), 255)
+    渲染_玩家状态["能量_前景3"].color = (int(48*过渡_状态_玩家能量_颜色亮度3), int(0*过渡_状态_玩家能量_颜色亮度3), int(238*过渡_状态_玩家能量_颜色亮度3), 255)
+    if max(0,min(过渡_状态_玩家能量_前景条,50)) >= 48:
+        过渡_状态_玩家能量_颜色亮度1 = 过渡(过渡_状态_玩家能量_颜色亮度1,1,过渡参数_亮度_增加,dt)
+    else:
+        过渡_状态_玩家能量_颜色亮度1 = 过渡(过渡_状态_玩家能量_颜色亮度1,0.2,过渡参数_亮度_减少,dt)
+    #
+    if max(0,min(过渡_状态_玩家能量_前景条-50,50)) >= 48:
+        过渡_状态_玩家能量_颜色亮度2 = 过渡(过渡_状态_玩家能量_颜色亮度2,1,过渡参数_亮度_增加,dt)
+    else:
+        过渡_状态_玩家能量_颜色亮度2 = 过渡(过渡_状态_玩家能量_颜色亮度2,0.2,过渡参数_亮度_减少,dt)
+    #
+    if max(0,min(过渡_状态_玩家能量_前景条-100,50)) >= 48:
+        过渡_状态_玩家能量_颜色亮度3 = 过渡(过渡_状态_玩家能量_颜色亮度3,1,过渡参数_亮度_增加,dt)
+    else:
+        过渡_状态_玩家能量_颜色亮度3 = 过渡(过渡_状态_玩家能量_颜色亮度3,0.2,过渡参数_亮度_减少,dt)
 
     
 @window.event
@@ -260,25 +278,35 @@ def 玩家移动_跳跃(dt):
         可以跳跃 = True
 可以冲刺 = True
 def 玩家移动_冲刺(dt):
-    global 可以冲刺,冲刺力度倍数
+    global 可以冲刺,冲刺力度倍数,状态_玩家能量
     if 按键[pyglet.window.key.F]:
-        if 按键[pyglet.window.key.F] and 可以冲刺:
+        if 按键[pyglet.window.key.F] and 可以冲刺 and 状态_玩家能量 >= 50:
             玩家X, 玩家Y = 物体["玩家"]["body"].position
             方向X = cam_鼠标X - 玩家X
             方向Y = 玩家Y - cam_鼠标Y
             力_X = 方向X * 冲刺力度倍数
             力_Y = -方向Y * 冲刺力度倍数
             物体["玩家"]["body"].apply_force_at_local_point((力_X, 力_Y))
+            状态_玩家能量 -= 50
         可以冲刺 = False
     if not 按键[pyglet.window.key.F]:
         可以冲刺 = True
+可以切换全屏 = True
+def 全屏状态切换(dt):
+    global 可以切换全屏
+    if 按键[pyglet.window.key.F11]:
+        if 按键[pyglet.window.key.F11] and 可以切换全屏:
+           window.set_fullscreen(not window.fullscreen)
+        可以切换全屏 = False
+    if not 按键[pyglet.window.key.F11]:
+        可以切换全屏 = True
 # 你好呀!心情不好?data/assets/music有一个Subwoofer Lullaby - C418你可以放松下
 def 状态恢复(dt):
     global 状态_玩家血量,状态_玩家能量
     if not 状态_玩家血量 >= 100:
         状态_玩家血量 += 0.1
     if not 状态_玩家能量 >= 150:
-        状态_玩家能量 += 0.1
+        状态_玩家能量 += 1
 def 摄像机系统(dt):
     global cam_X,cam_Y,cam_鼠标偏移系数,cam_过渡系数,cam_鼠标X,cam_鼠标Y,鼠标x,鼠标y
     cam_X_基础 = 物体["玩家"]["body"].position[0] - window.width//2
@@ -295,10 +323,10 @@ def 摄像机系统(dt):
 pyglet.clock.schedule_interval(玩家移动_平移, 1/90.0)
 pyglet.clock.schedule_interval(玩家移动_跳跃, 1/60.0)
 pyglet.clock.schedule_interval(玩家移动_冲刺, 1/60.0)
+pyglet.clock.schedule_interval(全屏状态切换, 1/60.0)
 pyglet.clock.schedule_interval(摄像机系统, 1/60.0)
 pyglet.clock.schedule_interval(渲染任务_物理体, 1/120.0)
 pyglet.clock.schedule_interval(渲染任务_玩家状态, 1/120.0)
-# pyglet.clock.schedule_interval(渲染任务_指示红线, 1/120.0)
 pyglet.clock.schedule_interval(状态恢复, 1/30.0)
 pyglet.app.run()
 """SW4gbXkgZXllcywgbWFraW5nIGEgZ2FtZSB3aXRoIGNvZGUgcmF0aGVyIHRoYW4gYW4gZW
